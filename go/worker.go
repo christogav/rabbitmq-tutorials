@@ -5,12 +5,12 @@ import (
 	"log"
 	"time"
 
-	"github.com/streadway/amqp"
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 func failOnError(err error, msg string) {
 	if err != nil {
-		log.Fatalf("%s: %s", msg, err)
+		log.Panicf("%s: %s", msg, err)
 	}
 }
 
@@ -51,13 +51,13 @@ func main() {
 	)
 	failOnError(err, "Failed to register a consumer")
 
-	forever := make(chan bool)
+	var forever chan struct{}
 
 	go func() {
 		for d := range msgs {
 			log.Printf("Received a message: %s", d.Body)
-			dot_count := bytes.Count(d.Body, []byte("."))
-			t := time.Duration(dot_count)
+			dotCount := bytes.Count(d.Body, []byte("."))
+			t := time.Duration(dotCount)
 			time.Sleep(t * time.Second)
 			log.Printf("Done")
 			d.Ack(false)

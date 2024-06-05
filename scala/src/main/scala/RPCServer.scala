@@ -1,8 +1,45 @@
+import java.util.concurrent.CountDownLatch
+
 import com.rabbitmq.client.AMQP.BasicProperties
-import com.rabbitmq.client.{Channel, Connection, ConnectionFactory, QueueingConsumer}
+import com.rabbitmq.client._
+
+class ServerCallback(val ch: Channel, val latch: CountDownLatch) extends DeliverCallback {
+
+  override def handle(consumerTag: String, delivery: Delivery): Unit = {
+    var response: String = null
+    val replyProps = new BasicProperties.Builder()
+      .correlationId(delivery.getProperties.getCorrelationId)
+      .build
+
+    try {
+      val message = new String(delivery.getBody, "UTF-8")
+      val n = java.lang.Integer.parseInt(message)
+      println(" [.] fib(" + message + ")")
+      response = "" + Fibonacci.fib(n)
+    } catch {
+      case e: Exception => {
+        println(" [.] " + e.toString)
+        response = ""
+      }
+    } finally {
+      ch.basicPublish("", delivery.getProperties.getReplyTo, replyProps, response.getBytes("UTF-8"))
+      ch.basicAck(delivery.getEnvelope.getDeliveryTag, false)
+      latch.countDown()
+    }
+
+  }
+
+}
+
+object Fibonacci {
+   def fib(n: Int): Int = {
+    if (n == 0) return 0
+    if (n == 1) return 1
+    fib(n - 1) + fib(n - 2)
+  }
+}
 
 object RPCServer {
-
   private val RPC_QUEUE_NAME = "rpc_queue"
 
   def main(argv: Array[String]) {
@@ -15,30 +52,12 @@ object RPCServer {
       channel = connection.createChannel()
       channel.queueDeclare(RPC_QUEUE_NAME, false, false, false, null)
       channel.basicQos(1)
-      val consumer = new QueueingConsumer(channel)
-      channel.basicConsume(RPC_QUEUE_NAME, false, consumer)
+      // stop after one consumed message since this is example code
+      val latch = new CountDownLatch(1)
+      val serverCallback = new ServerCallback(channel, latch)
+      channel.basicConsume(RPC_QUEUE_NAME, false, serverCallback, _ => { })
       println(" [x] Awaiting RPC requests")
-      while (true) {
-        var response: String = null
-        val delivery = consumer.nextDelivery()
-        val props = delivery.getProperties
-        val replyProps = new BasicProperties.Builder().correlationId(props.getCorrelationId)
-          .build()
-        try {
-          val message = new String(delivery.getBody, "UTF-8")
-          val n = java.lang.Integer.parseInt(message)
-          println(" [.] fib(" + message + ")")
-          response = "" + fib(n)
-        } catch {
-          case e: Exception => {
-            println(" [.] " + e.toString)
-            response = ""
-          }
-        } finally {
-          channel.basicPublish("", props.getReplyTo, replyProps, response.getBytes("UTF-8"))
-          channel.basicAck(delivery.getEnvelope.getDeliveryTag, false)
-        }
-      }
+      latch.await()
     } catch {
       case e: Exception => e.printStackTrace()
     } finally {
@@ -50,11 +69,5 @@ object RPCServer {
         }
       }
     }
-  }
-
-  private def fib(n: Int): Int = {
-    if (n == 0) return 0
-    if (n == 1) return 1
-    fib(n - 1) + fib(n - 2)
   }
 }

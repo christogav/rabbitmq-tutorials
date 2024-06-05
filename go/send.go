@@ -1,14 +1,16 @@
 package main
 
 import (
+	"context"
 	"log"
+	"time"
 
-	"github.com/streadway/amqp"
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 func failOnError(err error, msg string) {
 	if err != nil {
-		log.Fatalf("%s: %s", msg, err)
+		log.Panicf("%s: %s", msg, err)
 	}
 }
 
@@ -30,9 +32,11 @@ func main() {
 		nil,     // arguments
 	)
 	failOnError(err, "Failed to declare a queue")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-	body := "hello"
-	err = ch.Publish(
+	body := "Hello World!"
+	err = ch.PublishWithContext(ctx,
 		"",     // exchange
 		q.Name, // routing key
 		false,  // mandatory
@@ -41,6 +45,6 @@ func main() {
 			ContentType: "text/plain",
 			Body:        []byte(body),
 		})
-	log.Printf(" [x] Sent %s", body)
 	failOnError(err, "Failed to publish a message")
+	log.Printf(" [x] Sent %s\n", body)
 }

@@ -32,7 +32,7 @@ class FibonacciRpcClient
             $this->callback_queue,
             '',
             false,
-            false,
+            true,
             false,
             false,
             array(
@@ -45,7 +45,7 @@ class FibonacciRpcClient
     public function onResponse($rep)
     {
         if ($rep->get('correlation_id') == $this->corr_id) {
-            $this->response = $rep->body;
+            $this->response = $rep->getBody();
         }
     }
 
@@ -72,3 +72,4 @@ class FibonacciRpcClient
 $fibonacci_rpc = new FibonacciRpcClient();
 $response = $fibonacci_rpc->call(30);
 echo ' [.] Got ', $response, "\n";
+?>

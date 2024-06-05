@@ -23,13 +23,15 @@ foreach ($severities as $severity) {
 echo " [*] Waiting for logs. To exit press CTRL+C\n";
 
 $callback = function ($msg) {
-    echo ' [x] ', $msg->delivery_info['routing_key'], ':', $msg->body, "\n";
+    echo ' [x] ', $msg->getRoutingKey(), ':', $msg->getBody(), "\n";
 };
 
 $channel->basic_consume($queue_name, '', false, true, false, false, $callback);
 
-while (count($channel->callbacks)) {
-    $channel->wait();
+try {
+    $channel->consume();
+} catch (\Throwable $exception) {
+    echo $exception->getMessage();
 }
 
 $channel->close();

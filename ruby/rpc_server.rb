@@ -19,12 +19,18 @@ class FibonacciServer
     connection.close
   end
 
+  def loop_forever
+    # This loop only exists to keep the main thread
+    # alive. Many real world apps won't need this.
+    loop { sleep 5 }
+  end
+
   private
 
   attr_reader :channel, :exchange, :queue, :connection
 
   def subscribe_to_queue
-    queue.subscribe(block: true) do |_delivery_info, properties, payload|
+    queue.subscribe do |_delivery_info, properties, payload|
       result = fibonacci(payload.to_i)
 
       exchange.publish(
@@ -47,6 +53,7 @@ begin
 
   puts ' [x] Awaiting RPC requests'
   server.start('rpc_queue')
+  server.loop_forever
 rescue Interrupt => _
   server.stop
 end

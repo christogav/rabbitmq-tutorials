@@ -1,15 +1,17 @@
 package main
 
 import (
+	"context"
 	"log"
 	"strconv"
+	"time"
 
-	"github.com/streadway/amqp"
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 func failOnError(err error, msg string) {
 	if err != nil {
-		log.Fatalf("%s: %s", msg, err)
+		log.Panicf("%s: %s", msg, err)
 	}
 }
 
@@ -60,9 +62,11 @@ func main() {
 	)
 	failOnError(err, "Failed to register a consumer")
 
-	forever := make(chan bool)
+	var forever chan struct{}
 
 	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
 		for d := range msgs {
 			n, err := strconv.Atoi(string(d.Body))
 			failOnError(err, "Failed to convert body to integer")
@@ -70,7 +74,7 @@ func main() {
 			log.Printf(" [.] fib(%d)", n)
 			response := fib(n)
 
-			err = ch.Publish(
+			err = ch.PublishWithContext(ctx,
 				"",        // exchange
 				d.ReplyTo, // routing key
 				false,     // mandatory

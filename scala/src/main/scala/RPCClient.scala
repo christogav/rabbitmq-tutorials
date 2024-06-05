@@ -1,7 +1,22 @@
 import java.util.UUID
+import java.util.concurrent.{ArrayBlockingQueue, BlockingQueue}
 
 import com.rabbitmq.client.AMQP.BasicProperties
-import com.rabbitmq.client.{Channel, Connection, ConnectionFactory, QueueingConsumer}
+import com.rabbitmq.client._
+
+class ResponseCallback(val corrId: String) extends DeliverCallback {
+  val response: BlockingQueue[String] = new ArrayBlockingQueue[String](1)
+
+  override def handle(consumerTag: String, message: Delivery): Unit = {
+    if (message.getProperties.getCorrelationId.equals(corrId)) {
+      response.offer(new String(message.getBody, "UTF-8"))
+    }
+  }
+
+  def take(): String = {
+    response.take();
+  }
+}
 
 class RPCClient(host: String) {
 
@@ -12,24 +27,18 @@ class RPCClient(host: String) {
   val channel: Channel = connection.createChannel()
   val requestQueueName: String = "rpc_queue"
   val replyQueueName: String = channel.queueDeclare().getQueue
-  val consumer: QueueingConsumer = new QueueingConsumer(channel)
-
-  channel.basicConsume(replyQueueName, true, consumer)
 
   def call(message: String): String = {
-    var response: String = null
     val corrId = UUID.randomUUID().toString
     val props = new BasicProperties.Builder().correlationId(corrId)
       .replyTo(replyQueueName)
       .build()
     channel.basicPublish("", requestQueueName, props, message.getBytes("UTF-8"))
-    while (response == null) {
-      val delivery = consumer.nextDelivery()
-      if (delivery.getProperties.getCorrelationId == corrId) {
-        response = new String(delivery.getBody, "UTF-8")
-      }
-    }
-    response
+
+    val responseCallback = new ResponseCallback(corrId)
+    channel.basicConsume(replyQueueName, true, responseCallback, _ => { })
+
+    responseCallback.take()
   }
 
   def close() {

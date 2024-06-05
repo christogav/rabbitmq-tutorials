@@ -1,9 +1,13 @@
 # Dotnet C# code for RabbitMQ tutorials
 
 Here you can find the C# code examples for [RabbitMQ
-tutorials](http://www.rabbitmq.com/getstarted.html).
+tutorials](https://www.rabbitmq.com/getstarted.html) using .NET 7.0.
+
+You will also find a solution file for Visual Studio 2022.
 
 To successfully use the examples you will need a running RabbitMQ server.
+
+You can easily set this up by [installing RabbitMQ](https://www.rabbitmq.com/docs/download).
 
 ## Requirements
 
@@ -12,48 +16,109 @@ To successfully use the examples you will need a running RabbitMQ server.
 * [dotnet core](https://www.microsoft.com/net/core)
 
 We're using the command line (start->run cmd.exe) to
-compile and run -p the code. Alternatively you could [use Visual Studio](https://github.com/rabbitmq/rabbitmq-tutorials/tree/master/dotnet-visual-studio) and [NuGet package](https://www.nuget.org/packages/RabbitMQ.Client/), but this set of tutorials assumes
+compile and run the code. Alternatively you could use Visual Studio, but this set of tutorials assumes
 the command line.
 
 ### Requirements on Linux
 
 * [dotnet core](https://www.microsoft.com/net/core)
 
-## Code
+### Code
 
 Each command is best run in a separate console/terminal instance run from the root
 of the tutorial directory.
 
-First run the `recompile.sh` script. This will run `dotnet restore` and build
-each project which is required before they can be run. Alternatively or if you are
-on windows cd into each project and run `dotnet restore` manually.
+#### [Tutorial one: "Hello World!"](https://www.rabbitmq.com/tutorials/tutorial-one-dotnet.html)
 
-#### [Tutorial one: "Hello World!"](http://www.rabbitmq.com/tutorial-one-dotnet.html)
+```bash
+# terminal tab 1
+dotnet run --project Receive/Receive.csproj
 
-    dotnet run -p Receive/Receive.csproj
-    dotnet run -p Send/Send.csproj
+# terminal tab 2
+dotnet run --project Send/Send.csproj
+```
 
-#### [Tutorial two: Work Queues](http://www.rabbitmq.com/tutorial-two-dotnet.html)
+#### [Tutorial two: Work Queues](https://www.rabbitmq.com/tutorials/tutorial-two-dotnet.html)
 
-    dotnet run -p Worker/Worker.csproj
-    dotnet run -p NewTask/NewTask.csproj
+```bash
+# terminal tab 1
+dotnet run --project Worker/Worker.csproj
 
-#### [Tutorial three: Publish/Subscribe](http://www.rabbitmq.com/tutorial-three-dotnet.html)
+# terminal tab 2
+dotnet run --project Worker/Worker.csproj
 
-    dotnet run -p ReceiveLogs/ReceiveLogs.csproj
-    dotnet run -p EmitLog/EmitLog.csproj
+# terminal tab 3
+dotnet run --project NewTask/NewTask.csproj "First Message"
+dotnet run --project NewTask/NewTask.csproj "Second Message"
+dotnet run --project NewTask/NewTask.csproj "Third Message"
+dotnet run --project NewTask/NewTask.csproj "Fourth Message"
+dotnet run --project NewTask/NewTask.csproj "Fifth Message"
+```
 
-#### [Tutorial four: Routing](http://www.rabbitmq.com/tutorial-four-dotnet.html)
+#### [Tutorial three: Publish/Subscribe](https://www.rabbitmq.com/tutorials/tutorial-three-dotnet.html)
 
-    dotnet run -p ReceiveLogsDirect/ReceiveLogsDirect.csproj info
-    dotnet run -p EmitLogDirect/EmitLogDirect.csproj
+```bash
+# terminal tab 1
+dotnet run --project ReceiveLogs/ReceiveLogs.csproj
 
-#### [Tutorial five: Topics](http://www.rabbitmq.com/tutorial-five-dotnet.html)
+# terminal tab 2
+dotnet run --project ReceiveLogs/ReceiveLogs.csproj
 
-    dotnet run -p ReceiveLogsTopic/ReceiveLogsTopic.csproj anonymous.info
-    dotnet run -p EmitLogTopic/EmitLogTopic.csproj
+# terminal tab 3
+dotnet run --project EmitLog/EmitLog.csproj
+```
 
-#### [Tutorial six: RPC](http://www.rabbitmq.com/tutorial-six-dotnet.html)
+#### [Tutorial four: Routing](https://www.rabbitmq.com/tutorials/tutorial-four-dotnet.html)
 
-    dotnet run -p RPCServer/RPCServer.csproj
-    dotnet run -p RPCClient/RPCClient.csproj
+```bash
+# terminal tab 1
+dotnet run --project ReceiveLogsDirect/ReceiveLogsDirect.csproj warning error
+
+# terminal tab 2
+dotnet run --project ReceiveLogsDirect/ReceiveLogsDirect.csproj info warning error
+
+# terminal tab 3
+dotnet run --project EmitLogDirect/EmitLogDirect.csproj info "Run. Run. Or it will explode."
+dotnet run --project EmitLogDirect/EmitLogDirect.csproj warning "Run. Run. Or it will explode."
+dotnet run --project EmitLogDirect/EmitLogDirect.csproj error "Run. Run. Or it will explode."
+```
+
+#### [Tutorial five: Topics](https://www.rabbitmq.com/tutorials/tutorial-five-dotnet.html)
+
+```bash
+# terminal tab 1
+# To receive all the logs:
+dotnet run --project ReceiveLogsTopic/ReceiveLogsTopic.csproj "#"
+
+# To receive all logs from the facility "kern":
+dotnet run --project ReceiveLogsTopic/ReceiveLogsTopic.csproj "kern.*"
+
+# Or if you want to hear only about "critical" logs:
+dotnet run --project ReceiveLogsTopic/ReceiveLogsTopic.csproj "*.critical"
+
+# You can create multiple bindings:
+dotnet run --project ReceiveLogsTopic/ReceiveLogsTopic.csproj "kern.*" "*.critical"
+
+# terminal tab 2
+# And to emit a log with a routing key "kern.critical" type:
+dotnet run --project EmitLogTopic/EmitLogTopic.csproj kern.critical "A critical kernel error"
+```
+
+#### [Tutorial six: RPC](https://www.rabbitmq.com/tutorials/tutorial-six-dotnet.html)
+
+```bash
+# terminal tab 1
+# Our RPC service is now ready. We can start the server:
+dotnet run --project RPCServer/RPCServer.csproj
+
+# terminal tab 2
+# To request a fibonacci number run the client:
+dotnet run --project RPCClient/RPCClient.csproj
+```
+
+#### [Tutorial seven: Publisher Confirms](https://www.rabbitmq.com/tutorials/tutorial-seven-dotnet.html)
+
+```bash
+# terminal tab 1
+dotnet run --project PublisherConfirms/PublisherConfirms.csproj
+```

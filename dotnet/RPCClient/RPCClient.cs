@@ -1,79 +1,84 @@
-using System;
 using System.Collections.Concurrent;
 using System.Text;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 
-public class RpcClient
+public class RpcClient : IDisposable
 {
+    private const string QUEUE_NAME = "rpc_queue";
+
     private readonly IConnection connection;
     private readonly IModel channel;
     private readonly string replyQueueName;
-    private readonly EventingBasicConsumer consumer;
-    private readonly BlockingCollection<string> respQueue = new BlockingCollection<string>();
-    private readonly IBasicProperties props;
+    private readonly ConcurrentDictionary<string, TaskCompletionSource<string>> callbackMapper = new();
 
     public RpcClient()
     {
-        var factory = new ConnectionFactory() { HostName = "localhost" };
+        var factory = new ConnectionFactory { HostName = "localhost" };
 
         connection = factory.CreateConnection();
         channel = connection.CreateModel();
+        // declare a server-named queue
         replyQueueName = channel.QueueDeclare().QueueName;
-        consumer = new EventingBasicConsumer(channel);
+        var consumer = new EventingBasicConsumer(channel);
+        consumer.Received += (model, ea) =>
+        {
+            if (!callbackMapper.TryRemove(ea.BasicProperties.CorrelationId, out var tcs))
+                return;
+            var body = ea.Body.ToArray();
+            var response = Encoding.UTF8.GetString(body);
+            tcs.TrySetResult(response);
+        };
 
-        props = channel.CreateBasicProperties();
+        channel.BasicConsume(consumer: consumer,
+                             queue: replyQueueName,
+                             autoAck: true);
+    }
+
+    public Task<string> CallAsync(string message, CancellationToken cancellationToken = default)
+    {
+        IBasicProperties props = channel.CreateBasicProperties();
         var correlationId = Guid.NewGuid().ToString();
         props.CorrelationId = correlationId;
         props.ReplyTo = replyQueueName;
-
-        consumer.Received += (model, ea) =>
-        {
-            var body = ea.Body;
-            var response = Encoding.UTF8.GetString(body);
-            if (ea.BasicProperties.CorrelationId == correlationId)
-            {
-                respQueue.Add(response);
-            }
-        };
-    }
-
-    public string Call(string message)
-    {
-
         var messageBytes = Encoding.UTF8.GetBytes(message);
-        channel.BasicPublish(
-            exchange: "",
-            routingKey: "rpc_queue",
-            basicProperties: props,
-            body: messageBytes);
+        var tcs = new TaskCompletionSource<string>();
+        callbackMapper.TryAdd(correlationId, tcs);
 
+        channel.BasicPublish(exchange: string.Empty,
+                             routingKey: QUEUE_NAME,
+                             basicProperties: props,
+                             body: messageBytes);
 
-        channel.BasicConsume(
-            consumer: consumer,
-            queue: replyQueueName,
-            autoAck: true);
-
-        return respQueue.Take(); ;
+        cancellationToken.Register(() => callbackMapper.TryRemove(correlationId, out _));
+        return tcs.Task;
     }
 
-    public void Close()
+    public void Dispose()
     {
+        channel.Close();
         connection.Close();
     }
 }
 
 public class Rpc
 {
-    public static void Main()
+    public static async Task Main(string[] args)
     {
-        var rpcClient = new RpcClient();
+        Console.WriteLine("RPC Client");
+        string n = args.Length > 0 ? args[0] : "30";
+        await InvokeAsync(n);
 
-        Console.WriteLine(" [x] Requesting fib(30)");
-        var response = rpcClient.Call("30");
+        Console.WriteLine(" Press [enter] to exit.");
+        Console.ReadLine();
+    }
 
+    private static async Task InvokeAsync(string n)
+    {
+        using var rpcClient = new RpcClient();
+
+        Console.WriteLine(" [x] Requesting fib({0})", n);
+        var response = await rpcClient.CallAsync(n);
         Console.WriteLine(" [.] Got '{0}'", response);
-        rpcClient.Close();
     }
 }
-
